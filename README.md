@@ -19,6 +19,6 @@
   Everything in the lower half is not required so long as `WS_Enabled` is equal to `false`
 ### [Latest Release](https://github.com/Malphatt/Research-Arcade-Launcher/releases/latest "GitHub.com")
 ## Information
-  To run this system on an arcade machine you will need to launch this program using the [Research-Arcade-Updater](https://github.com/Malphatt/Research-Arcade-Updater "GitHub.com").
-  For further information, please refer to the [Docs](https://github.com/Malphatt/Arcademia-Dev-Guide/wiki)
+  To run this system on an arcade machine you will need to launch this program using the [Research-Arcade-Updater](https://github.com/ComputerScienceSociety/Research-Arcade-Updater "GitHub.com").
+  For further information, please refer to the [Docs](https://github.com/ComputerScienceSociety/Arcademia-Dev-Guide/wiki)
   
