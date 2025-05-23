@@ -23,6 +23,7 @@ using SharpDX.DirectInput;
 using XamlAnimatedGif;
 using NAudio.Wave;
 using Research_Arcade_Launcher;
+using static ArcademiaGameLauncher.ControllerState;
 
 namespace ArcademiaGameLauncher
 {
@@ -176,26 +177,29 @@ namespace ArcademiaGameLauncher
                 Directory.CreateDirectory(gameDirectoryPath);
 
             // Set the locations of each item on the start menu
-            int screenWidth = (int)SystemParameters.PrimaryScreenWidth;
-            int screenHeight = (int)SystemParameters.PrimaryScreenHeight;
+            string logicalScreenWidth_str = TryFindResource("LogicalSizeWidth").ToString();
+            string logicalScreenHeight_str = TryFindResource("LogicalSizeHeight").ToString();
+
+            double logicalScreenWidth = double.Parse(logicalScreenWidth_str);
+            double logicalScreenHeight = double.Parse(logicalScreenHeight_str);
 
             // StartMenu_Rect
-            double RectActualWidth = Math.Cos((double)5 * (Math.PI / (double)180)) * (double)StartMenu_Rect.Width;
-            double RectActualHeight = Math.Sin((double)5 * Math.PI / (double)180) * (double)StartMenu_Rect.Width + Math.Cos((double)5 * Math.PI / (double)180) * (double)StartMenu_Rect.Height;
+            double RectActualWidth = Math.Cos(5f * (Math.PI / 180f)) * (double)StartMenu_Rect.Width;
+            double RectActualHeight = Math.Sin(5f * Math.PI / 180f) * (double)StartMenu_Rect.Width + Math.Cos(5f * Math.PI / 180f) * (double)StartMenu_Rect.Height;
 
-            Canvas.SetLeft(StartMenu_Rect, (screenWidth / 2) - (RectActualWidth / 2) + ((double)screenWidth / 30));
-            Canvas.SetTop(StartMenu_Rect, screenHeight / 2 - RectActualHeight / 2);
+            Canvas.SetLeft(StartMenu_Rect, (logicalScreenWidth / 2f) - (RectActualWidth / 2f) + (logicalScreenWidth / 30f));
+            Canvas.SetTop(StartMenu_Rect, logicalScreenHeight / 2f - RectActualHeight / 2f);
 
             // StartMenu_ArcademiaLogo
-            Canvas.SetLeft(StartMenu_ArcademiaLogo, screenWidth / 2 - StartMenu_ArcademiaLogo.Width / 2);
+            Canvas.SetLeft(StartMenu_ArcademiaLogo, logicalScreenWidth / 2f - StartMenu_ArcademiaLogo.Width / 2f);
             Canvas.SetTop(StartMenu_ArcademiaLogo, 100);
 
             // PressStartText
-            Canvas.SetLeft(PressStartText, screenWidth / 2 - PressStartText.Width / 2);
-            Canvas.SetTop(PressStartText, screenHeight / 2 - PressStartText.Height / 2);
+            Canvas.SetLeft(PressStartText, logicalScreenWidth / 2f - PressStartText.Width / 2f);
+            Canvas.SetTop(PressStartText, logicalScreenHeight / 2f - PressStartText.Height / 2f);
 
             // Set width and height of the logos
-            double logoWidth = (double)screenWidth * (double)0.06;
+            double logoWidth = logicalScreenWidth * 0.06f;
 
             // UoL_Logo
             UoL_Logo.Width = logoWidth;
@@ -777,7 +781,10 @@ namespace ArcademiaGameLauncher
                     CSS_Logo.Visibility = Visibility.Visible;
 
                     // Set Canvas.Top of the CreditsPanel to the screen height
-                    Canvas.SetTop(CreditsPanel, (int)SystemParameters.PrimaryScreenHeight);
+                    string logicalScreenHeight_str = TryFindResource("LogicalSizeHeight").ToString();
+                    double logicalScreenHeight = double.Parse(logicalScreenHeight_str);
+
+                    Canvas.SetTop(CreditsPanel, logicalScreenHeight);
                 });
             }
             catch (TaskCanceledException) { }
@@ -930,6 +937,14 @@ namespace ArcademiaGameLauncher
             }
         }
 
+        private void ResetControllerStates()
+        {
+            timeSinceLastButton = 0;
+            // Reset the controller states
+            for (int i = 0; i < controllerStates.Count; i++)
+                controllerStates[i].ReleaseButtons();
+        }
+
         private void Window_ContentRendered(object sender, EventArgs e)
         {
             // Set the Copyright text
@@ -1062,8 +1077,6 @@ namespace ArcademiaGameLauncher
                     if (controllerStates[i].GetExitButtonHeldFor() > maxExitHeldFor)
                         maxExitHeldFor = controllerStates[i].GetExitButtonHeldFor();
 
-                Console.WriteLine(maxExitHeldFor);
-
                 // If the user has held the exit button for longer than 1 second, show the ForceExitMenu within the infoWindow
                 if (maxExitHeldFor >= 1000)
                 {
@@ -1081,17 +1094,24 @@ namespace ArcademiaGameLauncher
                     }
                 }
 
+                // GAME EXIT
                 // If the user has held the exit button for 3 seconds, close the currently running application
                 if (maxExitHeldFor >= 3000)
                 {
                     Application.Current?.Dispatcher?.Invoke(() =>
                     {
+                        ResetControllerStates();
                         currentlyRunningProcess.Kill();
-                        timeSinceLastButton = 0;
                         infoWindow?.HideWindow();
                         SetForegroundWindow(Process.GetCurrentProcess().MainWindowHandle);
                     });
                 }
+            }
+            else
+            {
+                // Hide the infoWindow if the currently running process has exited
+                if (infoWindow.Visibility == Visibility.Visible && infoWindow.ForceExitMenu.Visibility == Visibility.Visible)
+                    infoWindow?.HideWindow();
             }
 
 
@@ -1118,9 +1138,11 @@ namespace ArcademiaGameLauncher
                     // Hide the Window
                     infoWindow?.HideWindow();
 
+                    // GAME EXIT
                     // Close the currently running application
                     if (currentlyRunningProcess != null && !currentlyRunningProcess.HasExited)
                     {
+                        ResetControllerStates();
                         currentlyRunningProcess.Kill();
                         SetForegroundWindow(Process.GetCurrentProcess().MainWindowHandle);
                         currentlyRunningProcess = null;
@@ -1198,9 +1220,11 @@ namespace ArcademiaGameLauncher
                 catch (TaskCanceledException) { }
             }
 
+            // GAME EXIT
             // Check if the currently running process has exited, and set the focus back to the launcher
             if (currentlyRunningProcess != null && currentlyRunningProcess.HasExited)
             {
+                ResetControllerStates();
                 SetForegroundWindow(Process.GetCurrentProcess().MainWindowHandle);
                 currentlyRunningProcess = null;
 
@@ -1665,8 +1689,11 @@ namespace ArcademiaGameLauncher
             Canvas.SetTop(CreditsPanel, newTop);
 
             // If the CreditsPanel is off the screen, reset it to the bottom
+            string logicalScreenHeight_str = TryFindResource("LogicalSizeHeight").ToString();
+            double logicalScreenHeight = double.Parse(logicalScreenHeight_str);
+
             if (newTop < -CreditsPanel.ActualHeight)
-                Canvas.SetTop(CreditsPanel, (int)SystemParameters.PrimaryScreenHeight);
+                Canvas.SetTop(CreditsPanel, logicalScreenHeight);
         }
 
         // Getters & Setters
@@ -1779,7 +1806,7 @@ namespace ArcademiaGameLauncher
                 }
 
                 // Check if the Start/A button is pressed
-                if (timeSinceLastButton > 250 && (controllerStates[i].GetButtonState(1) || controllerStates[i].GetButtonState(2)))
+                if (timeSinceLastButton > 250 && (controllerStates[i].GetButtonDownState(ControllerState.ControllerButtons.Start) || controllerStates[i].GetButtonDownState(ControllerState.ControllerButtons.A)))
                 {
                     // Reset the time since the last button press
                     timeSinceLastButton = 0;
@@ -1822,7 +1849,7 @@ namespace ArcademiaGameLauncher
                 }
 
                 // Check if the Exit/B button is pressed
-                if (timeSinceLastButton > 250 && (controllerStates[i].GetButtonState(0) || controllerStates[i].GetButtonState(3)))
+                if (timeSinceLastButton > 250 && (controllerStates[i].GetButtonDownState(ControllerState.ControllerButtons.Exit) || controllerStates[i].GetButtonDownState(ControllerState.ControllerButtons.B)))
                 {
                     // Reset the time since the last button press
                     timeSinceLastButton = 0;
@@ -1913,27 +1940,19 @@ namespace ArcademiaGameLauncher
             int exitHeldMilliseconds = 1500;
 
             // Update the held countdown text
-            bool exitHeld = false;
             int maxExitHeldFor = 0;
-            foreach (ControllerState controllerState in controllerStates)
-                if (controllerState.GetButtonState(0))
-                {
-                    exitHeld = true;
-                    maxExitHeldFor = Math.Max(maxExitHeldFor, controllerState.GetExitButtonHeldFor());
-                }
+            for (int i = 0; i < controllerStates.Count; i++)
+                if (controllerStates[i].GetExitButtonHeldFor() > maxExitHeldFor)
+                    maxExitHeldFor = controllerStates[i].GetExitButtonHeldFor();
 
-
-            if (exitHeld)
+            if (maxExitHeldFor > 0)
                 InputMenu_HoldBackCountdownText.Text = ((double)(exitHeldMilliseconds - maxExitHeldFor) / 1000).ToString("0.0");
             else
                 InputMenu_HoldBackCountdownText.Text = "";
 
-            // Check if the exit button has been held for 1.5 seconds
-            if (exitHeld && maxExitHeldFor >= exitHeldMilliseconds)
-            {
-                // Go back to the Start Menu
+            // Check if the exit button has been held for 1.5 seconds, if so, go back to the Start Menu
+            if (maxExitHeldFor >= exitHeldMilliseconds)
                 ExitButton_Click(null, null);
-            }
 
             // For each Controller State
             for (int i = 0; i < controllerStates.Count; i++)
@@ -1949,7 +1968,7 @@ namespace ArcademiaGameLauncher
                         continue;
 
                     // If the user is pressing the button, highlight the button
-                    if (controllerStates[i].GetButtonState(j))
+                    if (controllerStates[i].GetButtonState((ControllerButtons)j))
                     {
                         inputMenuButtons[i][j].Fill = activeFillColour;
                         inputMenuButtons[i][j].Stroke = activeBorderColour;
